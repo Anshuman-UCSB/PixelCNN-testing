@@ -49,7 +49,7 @@ class CausalBlock(nn.Module):
 
 
 class GatedBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, data_channels):
+    def __init__(self, in_channels, out_channels, kernel_size, data_channels, classes):
         super(GatedBlock, self).__init__()
         self.split_size = out_channels
 
@@ -84,7 +84,7 @@ class GatedBlock(nn.Module):
                                    mask_type='B',
                                    data_channels=data_channels)
 
-        self.label_embedding = nn.Embedding(10, 2*out_channels)
+        self.label_embedding = nn.Embedding(classes, 2*out_channels)
 
     def forward(self, x):
         v_in, h_in, skip, label = x[0], x[1], x[2], x[3]
@@ -121,6 +121,7 @@ class PixelCNN(nn.Module):
         super(PixelCNN, self).__init__()
 
         DATA_CHANNELS = 3
+        self.classes = cfg.classes
 
         self.hidden_fmaps = cfg.hidden_fmaps
         self.color_levels = cfg.color_levels
@@ -131,10 +132,10 @@ class PixelCNN(nn.Module):
                                        data_channels=DATA_CHANNELS)
 
         self.hidden_conv = nn.Sequential(
-            *[GatedBlock(cfg.hidden_fmaps, cfg.hidden_fmaps, cfg.hidden_ksize, DATA_CHANNELS) for _ in range(cfg.hidden_layers)]
+            *[GatedBlock(cfg.hidden_fmaps, cfg.hidden_fmaps, cfg.hidden_ksize, DATA_CHANNELS, self.classes) for _ in range(cfg.hidden_layers)]
         )
 
-        self.label_embedding = nn.Embedding(10, self.hidden_fmaps)
+        self.label_embedding = nn.Embedding(self.classes, self.hidden_fmaps)
 
         self.out_hidden_conv = MaskedConv2d(cfg.hidden_fmaps,
                                             cfg.out_hidden_fmaps,
@@ -170,15 +171,19 @@ class PixelCNN(nn.Module):
 
         return out
 
-    def sample(self, shape, count, label=None, device='cuda'):
+    def sample(self, shape, count, label=None, device='cuda', pbar=True):
         channels, height, width = shape
 
         samples = torch.zeros(count, *shape).to(device)
         if label is None:
-            labels = torch.randint(high=10, size=(count,)).to(device)
+            labels = torch.randint(high=self.classes, size=(count,)).to(device)
         else:
             labels = (label*torch.ones(count)).to(device).long()
-
+        # print("generating with labels",labels)
+        if pbar:
+            from tqdm import tqdm
+            pbar = tqdm(total=height*width*channels, desc="Generating samples: ".ljust(20))
+        # Modify this to only do masked pixels
         with torch.no_grad():
             for i in range(height):
                 for j in range(width):
@@ -187,5 +192,39 @@ class PixelCNN(nn.Module):
                         pixel_probs = torch.softmax(unnormalized_probs[:, :, c, i, j], dim=1)
                         sampled_levels = torch.multinomial(pixel_probs, 1).squeeze().float() / (self.color_levels - 1)
                         samples[:, c, i, j] = sampled_levels
+                        if pbar:
+                            pbar.update(1)
+        if pbar:
+            pbar.close()
+
+        return samples
+
+    def inpaint(self, images, masks, labels, device='cuda', pbar=True):
+        assert images.shape == masks.shape, "images and masks are diff shapes {} {}".format(images.shape, masks.shape)
+        count,channels, height, width = images.shape
+
+        samples = torch.zeros(*images.shape).to(device)
+        # print("generating with labels",labels)
+        if pbar:
+            from tqdm import tqdm
+            pbar = tqdm(total=height*width*channels, desc="Generating samples: ".ljust(20))
+        # Modify this to only do masked pixels
+        with torch.no_grad():
+            for i in range(height):
+                for j in range(width):
+                    if torch.all(masks[:,:,i,j] < 0.1):
+                        samples[:,:,i,j] = images[:,:,i,j]
+                        if pbar:
+                            pbar.update(channels)
+                    else:
+                        for c in range(channels):
+                            unnormalized_probs = self.forward(samples, labels)
+                            pixel_probs = torch.softmax(unnormalized_probs[:, :, c, i, j], dim=1)
+                            sampled_levels = torch.multinomial(pixel_probs, 1).squeeze().float() / (self.color_levels - 1)
+                            samples[:, c, i, j] = sampled_levels * masks[:, c, i, j] + images[:,c,i,j]*(1-masks[:,c,i,j])
+                            if pbar:
+                                pbar.update(1)
+        if pbar:
+            pbar.close()
 
         return samples
