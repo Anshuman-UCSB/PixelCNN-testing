@@ -13,6 +13,7 @@ from utils import *
 
 from tqdm import tqdm
 import wandb
+from random import randint
 
 # This is to hack some issue with PIL images - see
 # https://wandb.ai/pixelcnn/PixelCNN/runs/lfa9h4h9
@@ -31,9 +32,24 @@ TRAIN_SAMPLES_DIR = 'train_samples'
 
 cfg = getCFG()
 cfg.save_sample = True
+def randomMask(shape):
+	mask = torch.zeros(shape)
+	rng = randint(0,100)
+	if rng < 20:
+		mask[:,5:25,5:25]=1
+		mask[:,10:20,10:20]=0
+	elif rng < 40:
+		mask[:,7:22,7:22]=1
+	elif rng < 60:
+		mask[:,:,0:6]=1
+	elif rng < 80:
+		mask[:,:,-6:]=1
+	else:
+		mask += torch.randint(0,2,mask.shape)
+	return mask
+
 def inpaint_test(cfg, model, device, test_loader):
 	test_loss = 0
-
 
 	saveflag = cfg.save_sample
 	model.eval()
@@ -41,11 +57,12 @@ def inpaint_test(cfg, model, device, test_loader):
 		for images, labels in tqdm(test_loader, desc="Inpainting".ljust(20)):
 			images = images.to(device, non_blocking=True)
 			labels = labels.to(device, non_blocking=True)
-			mask = torch.zeros(images.shape[1:]).to(device,non_blocking=True)
-			mask[:,5:25,5:25]=1
-			mask[:,10:20,10:20]=0
-			C,H,W =mask.shape
-			mask = mask.unsqueeze(0).expand(images.shape[0],C,H,W)
+			# mask = torch.zeros(images.shape[1:]).to(device,non_blocking=True)
+			# mask[:,5:25,5:25]=1
+			# mask[:,10:20,10:20]=0
+			# C,H,W =mask.shape
+			# mask = mask.unsqueeze(0).expand(images.shape[0],C,H,W)
+			mask = torch.stack([randomMask(images.shape[1:]) for _ in range(images.shape[0])]).to(device)
 			red_mask = torch.clone(mask)
 			red_mask[:,1:,:,:]*=0
 

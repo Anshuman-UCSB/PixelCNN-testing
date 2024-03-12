@@ -99,9 +99,9 @@ def get_loaders(cfg, train_root, test_root):
 	])
 
 
-	dataset_mappings = {'mnist': 'MNIST', 'fashionmnist': 'FashionMNIST',
-	 'cifar': 'CIFAR10', 'celeba':'CelebA', 'celeba-faces':'CelebA-Faces'}
-	dataset_mappings = {'mnist-flip': 'MNIST', 'fashionmnist': 'FashionMNIST',
+	# dataset_mappings = {'mnist': 'MNIST', 'fashionmnist': 'FashionMNIST',
+	#  'cifar': 'CIFAR10', 'celeba':'CelebA', 'celeba-faces':'CelebA-Faces'}
+	dataset_mappings = {'mnist': 'MNIST', 'mnist-flip': 'MNIST', 'fashionmnist': 'FashionMNIST',
 	 'cifar': 'CIFAR10', 'celeba':'CelebA', 'celeba-faces':'CelebA-Faces'}
 	hw_mappings = {'mnist': (28, 28), 'mnist-flip':(28,28),'fashionmnist': (28, 28), 'cifar': (32, 32), 'celeba': (50,50)}
 	transform_mappings = {'mnist': to_rgb, 'mnist-flip':flipped, 'fashionmnist': transforms.Compose([
