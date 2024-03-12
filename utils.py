@@ -41,7 +41,7 @@ def save_rows(arr_samples, dirname, filename):
 	count = arr_samples[0].size()[0]
 	arr_samples = torch.cat(arr_samples,dim=0)
 	nrow=count
-	arr_samples = flip(arr_samples)
+	# arr_samples = flip(arr_samples)
 	save_image(arr_samples, os.path.join(dirname, filename),nrow=nrow)
 
 def save_samples(samples, dirname, filename):

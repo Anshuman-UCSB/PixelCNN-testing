@@ -13,7 +13,7 @@ from utils import *
 
 from tqdm import tqdm
 import wandb
-from random import randint
+from random import choice
 
 # This is to hack some issue with PIL images - see
 # https://wandb.ai/pixelcnn/PixelCNN/runs/lfa9h4h9
@@ -34,18 +34,20 @@ cfg = getCFG()
 cfg.save_sample = True
 def randomMask(shape):
 	mask = torch.zeros(shape)
-	rng = randint(0,100)
-	if rng < 20:
+	rng = choice(range(6))
+	if rng == 0:
 		mask[:,5:25,5:25]=1
 		mask[:,10:20,10:20]=0
-	elif rng < 40:
+	elif rng == 1:
 		mask[:,7:22,7:22]=1
-	elif rng < 60:
-		mask[:,:,0:6]=1
-	elif rng < 80:
-		mask[:,:,-6:]=1
-	else:
+	elif rng == 2:
+		mask[:,:,0:10]=1
+	elif rng == 3:
+		mask[:,:,-10:]=1
+	elif rng == 4:
 		mask += torch.randint(0,2,mask.shape)
+	elif rng == 5:
+		mask[:,10:15,:]=1
 	return mask
 
 def inpaint_test(cfg, model, device, test_loader):
